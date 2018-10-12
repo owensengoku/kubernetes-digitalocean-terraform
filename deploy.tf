@@ -94,6 +94,28 @@ resource "digitalocean_droplet" "k8s_master" {
     }
 
     provisioner "file" {
+        source = "${path.module}/files/kubernetes/${var.k8s_version}/10-kubeadm.conf"
+        destination = "/tmp/10-kubeadm.conf"
+        connection {
+            type = "ssh",
+            user = "core",
+            private_key = "${file(var.ssh_private_key)}"
+        }
+    }
+
+    provisioner "file" {
+        source = "${path.module}/files/kubernetes/${var.k8s_version}/kubeadm.config.bashtpl"
+        destination = "/tmp/kubeadm.config.bashtpl"
+        connection {
+            type = "ssh",
+            user = "core",
+            private_key = "${file(var.ssh_private_key)}"
+        }
+    }
+
+
+
+    provisioner "file" {
         content      =<<EOF
 [Service]
 Environment="KUBELET_EXTRA_ARGS=--node-ip=${self.ipv4_address_private}"
@@ -135,7 +157,6 @@ EOF
     }
 }
 
-
 ###############################################################################
 #
 # Worker hosts
@@ -166,15 +187,15 @@ resource "digitalocean_droplet" "k8s_worker" {
     }
 
     provisioner "file" {
-        source = "./install-kubeadm.sh"
-        destination = "/tmp/install-kubeadm.sh"
+        source = "${path.module}/files/kubernetes/${var.k8s_version}/10-kubeadm.conf"
+        destination = "/tmp/10-kubeadm.conf"
         connection {
             type = "ssh",
             user = "core",
             private_key = "${file(var.ssh_private_key)}"
         }
     }
-    
+
     provisioner "file" {
         content      =<<EOF
 [Service]
@@ -188,6 +209,16 @@ EOF
         }
     }
 
+    provisioner "file" {
+        source = "./install-kubeadm.sh"
+        destination = "/tmp/install-kubeadm.sh"
+        connection {
+            type = "ssh",
+            user = "core",
+            private_key = "${file(var.ssh_private_key)}"
+        }
+    }
+    
     provisioner "file" {
         source = "./secrets/kubeadm_join"
         destination = "/tmp/kubeadm_join"
@@ -225,4 +256,5 @@ kubectl delete nodes/${self.name}
 EOF
     }
 }
+
 
