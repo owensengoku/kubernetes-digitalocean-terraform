@@ -1,7 +1,8 @@
 #!/usr/bin/bash
 set -o nounset -o errexit
 
-kubeadm init --pod-network-cidr=192.168.0.0/16 --apiserver-advertise-address=${MASTER_PRIVATE_IP} --apiserver-cert-extra-sans=${MASTER_PUBLIC_IP}
+envsubst < /tmp/kubeadm.config.bashtpl > /tmp/kubeadm.config
+kubeadm init --config /tmp/kubeadm.config
 mkdir -p $HOME/.kube
 cp -i /etc/kubernetes/admin.conf $HOME/.kube/config
 chown core:core $HOME/.kube/config
