@@ -65,7 +65,6 @@ provider "digitalocean" {
 #
 ###############################################################################
 
-
 resource "digitalocean_droplet" "k8s_master" {
     image = "coreos-stable"
     name = "${var.prefix}k8s-master"
@@ -87,6 +86,19 @@ resource "digitalocean_droplet" "k8s_master" {
     provisioner "file" {
         source = "./install-kubeadm.sh"
         destination = "/tmp/install-kubeadm.sh"
+        connection {
+            type = "ssh",
+            user = "core",
+            private_key = "${file(var.ssh_private_key)}"
+        }
+    }
+
+    provisioner "file" {
+        content      =<<EOF
+[Service]
+Environment="KUBELET_EXTRA_ARGS=--node-ip=${self.ipv4_address_private}"
+EOF
+        destination = "/tmp/20-node.conf"
         connection {
             type = "ssh",
             user = "core",
@@ -123,6 +135,7 @@ EOF
     }
 }
 
+
 ###############################################################################
 #
 # Worker hosts
@@ -155,6 +168,19 @@ resource "digitalocean_droplet" "k8s_worker" {
     provisioner "file" {
         source = "./install-kubeadm.sh"
         destination = "/tmp/install-kubeadm.sh"
+        connection {
+            type = "ssh",
+            user = "core",
+            private_key = "${file(var.ssh_private_key)}"
+        }
+    }
+    
+    provisioner "file" {
+        content      =<<EOF
+[Service]
+Environment="KUBELET_EXTRA_ARGS=--node-ip=${self.ipv4_address_private}"
+EOF
+        destination = "/tmp/20-node.conf"
         connection {
             type = "ssh",
             user = "core",
@@ -200,29 +226,3 @@ EOF
     }
 }
 
-# use kubeconfig retrieved from master
-
-resource "null_resource" "deploy_microbot" {
-    depends_on = ["digitalocean_droplet.k8s_worker"]
-    provisioner "local-exec" {
-        command = <<EOF
-            export KUBECONFIG=${path.module}/secrets/admin.conf
-            sed -e "s/\$EXT_IP1/${digitalocean_droplet.k8s_worker.0.ipv4_address}/" < ${path.module}/02-microbot.yaml > ./secrets/02-microbot.rendered.yaml
-            until kubectl get pods 2>/dev/null; do printf '.'; sleep 5; done
-            kubectl create -f ./secrets/02-microbot.rendered.yaml
-EOF
-    }
-}
-
-resource "null_resource" "deploy_digitalocean_cloud_controller_manager" {
-    depends_on = ["digitalocean_droplet.k8s_worker"]
-    provisioner "local-exec" {
-        command = <<EOF
-            export KUBECONFIG=${path.module}/secrets/admin.conf
-            sed -e "s/\$DO_ACCESS_TOKEN/${var.do_token}/" < ${path.module}/03-do-secret.yaml > ./secrets/03-do-secret.rendered.yaml
-            until kubectl get pods 2>/dev/null; do printf '.'; sleep 5; done
-            kubectl create -f ./secrets/03-do-secret.rendered.yaml
-            kubectl create -f https://raw.githubusercontent.com/digitalocean/digitalocean-cloud-controller-manager/master/releases/v0.1.3.yml
-EOF
-    }
-}
