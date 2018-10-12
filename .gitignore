@@ -10,4 +10,5 @@ secrets/
 # Terraform assets
 *.tfstate
 *.tfstate.backup
+*.plan
 
